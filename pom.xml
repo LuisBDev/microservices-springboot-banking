@@ -26,7 +26,7 @@
     <modules>
         <module>infra/eureka-server</module>
         <module>infra/config-server</module>
-<!--        <module>infra/api-gateway</module>-->
+        <module>infra/api-gateway</module>
 <!--        <module>services/users-service</module>-->
 <!--        <module>services/orders-service</module>-->
 <!--        <module>services/payments-service</module>-->
