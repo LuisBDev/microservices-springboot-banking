@@ -32,7 +32,7 @@
         <module>infra/api-gateway</module>
         <module>services/users-service</module>
         <module>services/orders-service</module>
-        <!--        <module>services/payments-service</module>-->
+        <module>services/payments-service</module>
         <module>services/inventory-service</module>
     </modules>
 
