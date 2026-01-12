@@ -1,5 +1,7 @@
 package com.msbanking.inventory_service.service.impl;
 
+import com.msbanking.commons.exception.BusinessException;
+import com.msbanking.commons.exception.ErrorCode;
 import com.msbanking.inventory_service.dto.request.CreateProductRequest;
 import com.msbanking.inventory_service.dto.request.ReserveStockRequest;
 import com.msbanking.inventory_service.dto.request.UpdateProductRequest;
@@ -35,7 +37,7 @@ public class ProductServiceImpl implements ProductService {
         log.info("Creating product with SKU: {}", request.getSku());
 
         if (productRepository.existsBySku(request.getSku())) {
-            throw new IllegalArgumentException("Product with SKU " + request.getSku() + " already exists");
+            throw new BusinessException(ErrorCode.DUPLICATE_PRODUCT, "Product with SKU " + request.getSku() + " already exists");
         }
 
         Product product = productMapper.toEntity(request);
@@ -50,7 +52,7 @@ public class ProductServiceImpl implements ProductService {
     public ProductResponse getProductById(Long id) {
         log.info("Fetching product with ID: {}", id);
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Product not found with ID: " + id));
+                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND, "Product not found with ID: " + id));
         return productMapper.toResponse(product);
     }
 
@@ -59,7 +61,7 @@ public class ProductServiceImpl implements ProductService {
     public ProductResponse getProductBySku(String sku) {
         log.info("Fetching product with SKU: {}", sku);
         Product product = productRepository.findBySku(sku)
-                .orElseThrow(() -> new IllegalArgumentException("Product not found with SKU: " + sku));
+                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND, "Product not found with SKU: " + sku));
         return productMapper.toResponse(product);
     }
 
@@ -79,7 +81,7 @@ public class ProductServiceImpl implements ProductService {
         log.info("Updating product with ID: {}", id);
 
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Product not found with ID: " + id));
+                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND, "Product not found with ID: " + id));
 
         productMapper.updateEntityFromRequest(request, product);
         Product updatedProduct = productRepository.save(product);
@@ -94,7 +96,7 @@ public class ProductServiceImpl implements ProductService {
         log.info("Deleting product with ID: {}", id);
 
         if (!productRepository.existsById(id)) {
-            throw new IllegalArgumentException("Product not found with ID: " + id);
+            throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND, "Product not found with ID: " + id);
         }
 
         productRepository.deleteById(id);
@@ -107,10 +109,10 @@ public class ProductServiceImpl implements ProductService {
         log.info("Reserving {} units of product with SKU: {}", request.getQuantity(), request.getSku());
 
         Product product = productRepository.findBySku(request.getSku())
-                .orElseThrow(() -> new IllegalArgumentException("Product not found with SKU: " + request.getSku()));
+                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND, "Product not found with SKU: " + request.getSku()));
 
         if (product.getQuantity() < request.getQuantity()) {
-            throw new IllegalStateException("Insufficient stock for product: " + request.getSku() +
+            throw new BusinessException(ErrorCode.INSUFFICIENT_STOCK, "Insufficient stock for product: " + request.getSku() +
                     ". Available: " + product.getQuantity() + ", Requested: " + request.getQuantity());
         }
 
@@ -127,7 +129,7 @@ public class ProductServiceImpl implements ProductService {
         log.info("Releasing {} units of product with SKU: {}", request.getQuantity(), request.getSku());
 
         Product product = productRepository.findBySku(request.getSku())
-                .orElseThrow(() -> new IllegalArgumentException("Product not found with SKU: " + request.getSku()));
+                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND, "Product not found with SKU: " + request.getSku()));
 
         product.setQuantity(product.getQuantity() + request.getQuantity());
         Product updatedProduct = productRepository.save(product);
@@ -142,7 +144,7 @@ public class ProductServiceImpl implements ProductService {
         log.info("Checking stock availability for SKU: {} with quantity: {}", sku, quantity);
 
         Product product = productRepository.findBySku(sku)
-                .orElseThrow(() -> new IllegalArgumentException("Product not found with SKU: " + sku));
+                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND, "Product not found with SKU: " + sku));
 
         boolean available = product.getQuantity() >= quantity;
         log.info("Stock availability for SKU {}: {}", sku, available);

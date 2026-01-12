@@ -61,6 +61,7 @@ API Gateway (8080)
 - **MapStruct**: Type-safe object mapping
 - **Jakarta Validation**: Input validation
 - **Spring Boot Actuator**: Production-ready monitoring and metrics
+- **Commons-Lib**: Shared library for standardized exception handling and error responses
 
 ### Development Tools
 
@@ -145,7 +146,7 @@ cd microservices_banking
 
 ### 2. Build the Project
 
-Build all modules from the root directory:
+Build commons-lib first, then all modules:
 
 ```bash
 mvn clean install -DskipTests
@@ -153,6 +154,7 @@ mvn clean install -DskipTests
 
 This command will:
 
+- Install commons-lib in local Maven repository
 - Compile all microservices
 - Generate MapStruct implementations
 - Package all applications
@@ -322,6 +324,11 @@ StripPrefix removes `/api` before forwarding to the target service.
 
 ```
 microservices_banking/
+├── commons-lib/             # Shared library for exception handling
+│   └── src/main/java/com/msbanking/commons/exception/
+│       ├── ErrorResponse.java       # Standard error response DTO
+│       ├── ErrorCode.java          # Centralized error catalog
+│       └── BusinessException.java  # Base business exception
 ├── infra/
 │   ├── api-gateway/         # API Gateway (Spring Cloud Gateway)
 │   ├── config-server/       # Config Server (Spring Cloud Config)
@@ -343,8 +350,12 @@ service/
 ├── repository/    # Data access layer
 ├── entity/        # JPA entities
 ├── dto/           # Data Transfer Objects
+│   ├── request/   # Request DTOs
+│   ├── response/  # Response DTOs
 ├── mapper/        # MapStruct mappers
 ├── client/        # Feign clients (Orders service only)
+├── exception/     # Exception handling
+│   └── GlobalExceptionHandler.java
 └── enums/         # Enumerations
 ```
 
@@ -381,13 +392,33 @@ curl http://localhost:8080/api/users/1
 - **Actuator Health**: `http://localhost:{port}/actuator/health` - Check service health
 - **Actuator Info**: `http://localhost:{port}/actuator/info` - Service information
 
+## Commons Library
+
+The project includes a **shared library** (`commons-lib`) that provides standardized components for exception handling and error responses across all microservices.
+
+### Components
+
+- **ErrorResponse**: Standardized error response DTO with consistent structure
+- **ErrorCode**: Centralized catalog of error codes organized by domain (ORD-XXX, USR-XXX, INV-XXX, PAY-XXX, GEN-XXX)
+- **BusinessException**: Base exception class for business logic errors
+
+### Installation
+
+The library is installed in the local Maven repository and included as a dependency in all microservices:
+
+```bash
+cd commons-lib
+mvn clean install
+```
+
 ## Best Practices Implemented
 
 - **Clean Code**: Meaningful names, SOLID principles, separation of concerns
 - **Layer Separation**: Controller → Service → Repository pattern
 - **DTO Pattern**: Separate DTOs from entities to avoid exposing internal structure
 - **Validation**: Jakarta Bean Validation on request DTOs
-- **Error Handling**: Proper exception handling in service layer
+- **Standardized Error Handling**: Shared commons-lib for consistent error responses
+- **Error Catalog**: Centralized error codes for better traceability and monitoring
 - **Database Migration**: Flyway for version-controlled schema changes
 - **Service Discovery**: Dynamic service registration, no hardcoded URLs
 - **Load Balancing**: Client-side load balancing via Eureka

@@ -1,6 +1,11 @@
 package com.msbanking.orders_service.exception;
 
-import org.springframework.http.HttpStatus;
+import com.msbanking.commons.exception.BusinessException;
+import com.msbanking.commons.exception.ErrorCode;
+import com.msbanking.commons.exception.ErrorResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -13,49 +18,62 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, Object>> handleIllegalArgumentException(IllegalArgumentException ex) {
-        return buildErrorResponse(ex.getMessage(), HttpStatus.BAD_REQUEST);
-    }
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    @ExceptionHandler(IllegalStateException.class)
-    public ResponseEntity<Map<String, Object>> handleIllegalStateException(IllegalStateException ex) {
-        return buildErrorResponse(ex.getMessage(), HttpStatus.CONFLICT);
-    }
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException ex, HttpServletRequest request) {
+        log.error("Business exception: {} - {}", ex.getErrorCode().getCode(), ex.getCustomMessage());
 
-    @ExceptionHandler(OrderProcessingException.class)
-    public ResponseEntity<Map<String, Object>> handleOrderProcessingException(OrderProcessingException ex) {
-        return buildErrorResponse(ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        ErrorResponse errorResponse = ErrorResponse.of(ex.getErrorCode(), ex.getCustomMessage(), request.getRequestURI());
+        return ResponseEntity
+                .status(ex.getErrorCode().getHttpStatus())
+                .body(errorResponse);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleValidationException(MethodArgumentNotValidException ex) {
+    public ResponseEntity<ErrorResponse> handleValidationException(MethodArgumentNotValidException ex, HttpServletRequest request) {
         Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getFieldErrors().forEach(error ->
                 errors.put(error.getField(), error.getDefaultMessage())
         );
-        
-        Map<String, Object> response = new HashMap<>();
-        response.put("timestamp", LocalDateTime.now());
-        response.put("status", HttpStatus.BAD_REQUEST.value());
-        response.put("error", "Validation Failed");
-        response.put("errors", errors);
-        
-        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(ErrorCode.VALIDATION_ERROR.getHttpStatus().value())
+                .error(ErrorCode.VALIDATION_ERROR.getHttpStatus().getReasonPhrase())
+                .message(ErrorCode.VALIDATION_ERROR.getMessage())
+                .code(ErrorCode.VALIDATION_ERROR.getCode())
+                .path(request.getRequestURI())
+                .validationErrors(errors)
+                .build();
+
+        return ResponseEntity
+                .status(ErrorCode.VALIDATION_ERROR.getHttpStatus())
+                .body(errorResponse);
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
-        return buildErrorResponse("An unexpected error occurred: " + ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+    public ResponseEntity<ErrorResponse> handleGenericException(Exception ex, HttpServletRequest request) {
+        log.error("Unexpected exception: ", ex);
+
+        ErrorResponse errorResponse = ErrorResponse.of(
+                ErrorCode.INTERNAL_SERVER_ERROR,
+                "An unexpected error occurred: " + ex.getMessage(),
+                request.getRequestURI()
+        );
+
+        return ResponseEntity
+                .status(ErrorCode.INTERNAL_SERVER_ERROR.getHttpStatus())
+                .body(errorResponse);
     }
 
-    private ResponseEntity<Map<String, Object>> buildErrorResponse(String message, HttpStatus status) {
-        Map<String, Object> response = new HashMap<>();
-        response.put("timestamp", LocalDateTime.now());
-        response.put("status", status.value());
-        response.put("error", status.getReasonPhrase());
-        response.put("message", message);
-        
-        return new ResponseEntity<>(response, status);
+    @ExceptionHandler(OrderProcessingException.class)
+    public ResponseEntity<ErrorResponse> handleOrderProcessingException(OrderProcessingException ex, HttpServletRequest request) {
+
+        ErrorResponse errorResponse = ErrorResponse.of(ErrorCode.ORDER_PROCESSING_FAILED, ex.getMessage(), request.getRequestURI());
+        return ResponseEntity
+                .status(ErrorCode.ORDER_PROCESSING_FAILED.getHttpStatus())
+                .body(errorResponse);
     }
+
 }

@@ -1,4 +1,4 @@
-package com.msbanking.users_service.exception;
+package com.msbanking.inventory_service.exception;
 
 import com.msbanking.commons.exception.BusinessException;
 import com.msbanking.commons.exception.ErrorCode;
@@ -7,7 +7,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -25,20 +24,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException ex, HttpServletRequest request) {
         log.error("Business exception: {} - {}", ex.getErrorCode().getCode(), ex.getCustomMessage());
         ErrorResponse errorResponse = ErrorResponse.of(ex.getErrorCode(), ex.getCustomMessage(), request.getRequestURI());
-
-        return ResponseEntity
-                .status(ex.getErrorCode().getHttpStatus())
-                .body(errorResponse);
+        return ResponseEntity.status(ex.getErrorCode().getHttpStatus()).body(errorResponse);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidationExceptions(MethodArgumentNotValidException ex, HttpServletRequest request) {
+    public ResponseEntity<ErrorResponse> handleValidationException(MethodArgumentNotValidException ex, HttpServletRequest request) {
         Map<String, String> errors = new HashMap<>();
-        ex.getBindingResult().getAllErrors().forEach(error -> {
-            String fieldName = ((FieldError) error).getField();
-            String errorMessage = error.getDefaultMessage();
-            errors.put(fieldName, errorMessage);
-        });
+        ex.getBindingResult().getFieldErrors().forEach(error ->
+                errors.put(error.getField(), error.getDefaultMessage())
+        );
 
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
@@ -50,9 +44,7 @@ public class GlobalExceptionHandler {
                 .validationErrors(errors)
                 .build();
 
-        return ResponseEntity
-                .status(ErrorCode.VALIDATION_ERROR.getHttpStatus())
-                .body(errorResponse);
+        return ResponseEntity.status(ErrorCode.VALIDATION_ERROR.getHttpStatus()).body(errorResponse);
     }
 
     @ExceptionHandler(Exception.class)
@@ -63,28 +55,6 @@ public class GlobalExceptionHandler {
                 "An unexpected error occurred: " + ex.getMessage(),
                 request.getRequestURI()
         );
-        return ResponseEntity
-                .status(ErrorCode.INTERNAL_SERVER_ERROR.getHttpStatus())
-                .body(errorResponse);
+        return ResponseEntity.status(ErrorCode.INTERNAL_SERVER_ERROR.getHttpStatus()).body(errorResponse);
     }
-
-    @ExceptionHandler(UserNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleUserNotFound(UserNotFoundException ex, HttpServletRequest request) {
-        log.error("User not found: {}", ex.getMessage());
-        ErrorResponse errorResponse = ErrorResponse.of(ErrorCode.USER_NOT_FOUND, ex.getMessage(), request.getRequestURI());
-        return ResponseEntity
-                .status(ErrorCode.USER_NOT_FOUND.getHttpStatus())
-                .body(errorResponse);
-    }
-
-    @ExceptionHandler(DuplicateUserException.class)
-    public ResponseEntity<ErrorResponse> handleDuplicateUser(DuplicateUserException ex, HttpServletRequest request) {
-        log.error("Duplicate user: {}", ex.getMessage());
-        ErrorResponse errorResponse = ErrorResponse.of(ErrorCode.DUPLICATE_USER, ex.getMessage(), request.getRequestURI());
-        return ResponseEntity
-                .status(ErrorCode.DUPLICATE_USER.getHttpStatus())
-                .body(errorResponse);
-    }
-
-
 }

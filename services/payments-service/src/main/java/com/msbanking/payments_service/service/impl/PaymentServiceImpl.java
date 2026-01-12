@@ -1,5 +1,7 @@
 package com.msbanking.payments_service.service.impl;
 
+import com.msbanking.commons.exception.BusinessException;
+import com.msbanking.commons.exception.ErrorCode;
 import com.msbanking.payments_service.dto.request.ProcessPaymentRequest;
 import com.msbanking.payments_service.dto.response.PaymentResponse;
 import com.msbanking.payments_service.entity.Payment;
@@ -56,7 +58,7 @@ public class PaymentServiceImpl implements PaymentService {
     public PaymentResponse getPaymentById(Long id) {
         log.info("Fetching payment with ID: {}", id);
         Payment payment = paymentRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Payment not found with ID: " + id));
+                .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND, "Payment not found with ID: " + id));
         return paymentMapper.toResponse(payment);
     }
 
@@ -65,7 +67,7 @@ public class PaymentServiceImpl implements PaymentService {
     public PaymentResponse getPaymentByTransactionId(String transactionId) {
         log.info("Fetching payment with transaction ID: {}", transactionId);
         Payment payment = paymentRepository.findByTransactionId(transactionId)
-                .orElseThrow(() -> new IllegalArgumentException("Payment not found with transaction ID: " + transactionId));
+                .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND, "Payment not found with transaction ID: " + transactionId));
         return paymentMapper.toResponse(payment);
     }
 
@@ -96,10 +98,10 @@ public class PaymentServiceImpl implements PaymentService {
         log.info("Processing refund for payment ID: {}", paymentId);
 
         Payment payment = paymentRepository.findById(paymentId)
-                .orElseThrow(() -> new IllegalArgumentException("Payment not found with ID: " + paymentId));
+                .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND, "Payment not found with ID: " + paymentId));
 
         if (payment.getStatus() != PaymentStatus.COMPLETED) {
-            throw new IllegalStateException("Only completed payments can be refunded");
+            throw new BusinessException(ErrorCode.PAYMENT_NOT_COMPLETED_FOR_REFUND);
         }
 
         payment.setStatus(PaymentStatus.REFUNDED);

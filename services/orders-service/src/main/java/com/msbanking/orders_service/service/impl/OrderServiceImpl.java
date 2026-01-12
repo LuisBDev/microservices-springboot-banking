@@ -1,5 +1,7 @@
 package com.msbanking.orders_service.service.impl;
 
+import com.msbanking.commons.exception.BusinessException;
+import com.msbanking.commons.exception.ErrorCode;
 import com.msbanking.orders_service.client.InventoryClient;
 import com.msbanking.orders_service.client.PaymentsClient;
 import com.msbanking.orders_service.client.UsersClient;
@@ -59,7 +61,7 @@ public class OrderServiceImpl implements OrderService {
                 .flatMap(products -> createPendingOrder(request, products))
                 .map(order -> processOrderWorkflow(order, request))
                 .map(orderMapper::toResponse)
-                .orElseThrow(() -> new IllegalStateException("Order creation failed"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_PROCESSING_FAILED));
     }
 
     private Optional<UserResponse> validateUser(Long userId) {
@@ -68,7 +70,7 @@ public class OrderServiceImpl implements OrderService {
             return Optional.of(usersClient.getUserById(userId));
         } catch (Exception e) {
             log.error("User validation failed for user ID: {}", userId, e);
-            throw new IllegalArgumentException("User not found with ID: " + userId);
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND, "User not found with ID: " + userId);
         }
     }
 
@@ -88,19 +90,21 @@ public class OrderServiceImpl implements OrderService {
             ProductResponse product = inventoryClient.getProductBySku(item.getSku());
 
             if (Boolean.FALSE.equals(product.getActive())) {
-                throw new IllegalArgumentException("Product is not active: " + item.getSku());
+                throw new BusinessException(ErrorCode.PRODUCT_NOT_ACTIVE, "Product is not active: " + item.getSku());
             }
 
             ProductStockAvailabilityResponse stockAvailability = inventoryClient.checkStockAvailability(item.getSku(), item.getQuantity());
 
             if (Boolean.FALSE.equals(stockAvailability.getAvailable())) {
-                throw new IllegalStateException("Insufficient stock for product: " + item.getSku());
+                throw new BusinessException(ErrorCode.INSUFFICIENT_STOCK, "Insufficient stock for product: " + item.getSku());
             }
 
             return product;
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Product validation failed for SKU: {}", item.getSku(), e);
-            throw new IllegalArgumentException("Product validation failed for SKU: " + item.getSku() + " - " + e.getMessage());
+            throw new BusinessException(ErrorCode.PRODUCT_VALIDATION_FAILED, "Product validation failed for SKU: " + item.getSku());
         }
     }
 
@@ -168,7 +172,7 @@ public class OrderServiceImpl implements OrderService {
         } catch (Exception e) {
             log.error("Error processing order: {}. Rolling back...", order.getId(), e);
             rollbackOrder(order, request.getItems());
-            throw new IllegalStateException("Order processing failed: " + e.getMessage(), e);
+            throw new BusinessException(ErrorCode.ORDER_PROCESSING_FAILED, "Order processing failed: " + e.getMessage(), e);
         }
     }
 
@@ -180,7 +184,7 @@ public class OrderServiceImpl implements OrderService {
             log.warn("Payment failed for order: {}. Rolling back...", order.getId());
             releaseStock(items);
             order.setStatus(OrderStatus.CANCELLED);
-            throw new IllegalStateException("Payment processing failed. Order cancelled.");
+            throw new BusinessException(ErrorCode.PAYMENT_PROCESSING_FAILED, "Payment processing failed. Order cancelled.");
         }
 
         return orderRepository.save(order);
@@ -277,10 +281,10 @@ public class OrderServiceImpl implements OrderService {
 
     private void validateCancellationAllowed(Order order) {
         if (order.getStatus() == OrderStatus.COMPLETED) {
-            throw new IllegalStateException("Cannot cancel a completed order");
+            throw new BusinessException(ErrorCode.ORDER_ALREADY_COMPLETED);
         }
         if (order.getStatus() == OrderStatus.CANCELLED) {
-            throw new IllegalStateException("Order is already cancelled");
+            throw new BusinessException(ErrorCode.ORDER_ALREADY_CANCELLED);
         }
     }
 
