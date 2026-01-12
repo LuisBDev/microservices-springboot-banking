@@ -15,21 +15,21 @@ spring:
             - Path=/api/users/**
           filters:
             - StripPrefix=1
-        
+
         - id: orders-service
           uri: lb://orders-service
           predicates:
             - Path=/api/orders/**
           filters:
             - StripPrefix=1
-        
+
         - id: payments-service
           uri: lb://payments-service
           predicates:
             - Path=/api/payments/**
           filters:
             - StripPrefix=1
-        
+
         - id: inventory-service
           uri: lb://inventory-service
           predicates:
@@ -51,3 +51,8 @@ management:
     web:
       exposure:
         include: health,info,gateway
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    reactor.netty.http.client: DEBUG
