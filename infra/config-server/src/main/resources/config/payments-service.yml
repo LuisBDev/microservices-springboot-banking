@@ -47,3 +47,7 @@ feign:
         connect-timeout: 5000
         read-timeout: 5000
         logger-level: basic
+
+logging:
+  level:
+    com.msbanking.payments_service: DEBUG
