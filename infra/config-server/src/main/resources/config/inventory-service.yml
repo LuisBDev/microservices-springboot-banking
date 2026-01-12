@@ -39,6 +39,15 @@ management:
     health:
       show-details: always
 
+# Feign clients configuration
+feign:
+  client:
+    config:
+      default:
+        connect-timeout: 5000
+        read-timeout: 5000
+        logger-level: basic
+
 logging:
   level:
     com.msbanking.inventory_service: DEBUG
