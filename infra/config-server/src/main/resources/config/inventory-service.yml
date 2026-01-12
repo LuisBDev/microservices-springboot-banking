@@ -38,3 +38,7 @@ management:
   endpoint:
     health:
       show-details: always
+
+logging:
+  level:
+    com.msbanking.inventory_service: DEBUG
