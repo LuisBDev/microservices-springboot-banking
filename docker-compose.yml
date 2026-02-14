@@ -1,0 +1,224 @@
+services:
+  # Infrastructure: Discovery Server (Eureka)
+  eureka-server:
+    build:
+      context: ./infra/eureka-server
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    networks:
+      - ms-banking-net
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 8761 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Infrastructure: Config Server
+  config-server:
+    build:
+      context: ./infra/config-server
+    container_name: config-server
+    ports:
+      - "8888:8888"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - ms-banking-net
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 8888 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Databases
+  users-db:
+    image: postgres:15-alpine
+    container_name: users-db
+    environment:
+      - POSTGRES_DB=users_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - users-db-data:/var/lib/postgresql/data
+    networks:
+      - ms-banking-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d users_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  inventory-db:
+    image: postgres:15-alpine
+    container_name: inventory-db
+    environment:
+      - POSTGRES_DB=inventory_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - inventory-db-data:/var/lib/postgresql/data
+    networks:
+      - ms-banking-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d inventory_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  orders-db:
+    image: postgres:15-alpine
+    container_name: orders-db
+    environment:
+      - POSTGRES_DB=orders_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5435:5432"
+    volumes:
+      - orders-db-data:/var/lib/postgresql/data
+    networks:
+      - ms-banking-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d orders_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  payments-db:
+    image: postgres:15-alpine
+    container_name: payments-db
+    environment:
+      - POSTGRES_DB=payments_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5436:5432"
+    volumes:
+      - payments-db-data:/var/lib/postgresql/data
+    networks:
+      - ms-banking-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d payments_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Business Services
+  users-service:
+    build:
+      context: .
+      dockerfile: services/users-service/Dockerfile
+    container_name: users-service
+    ports:
+      - "8081:8081"
+    environment:
+      # Jerarquia para resolver propiedades:
+      #    1. Argumentos de línea de comandos (--server.port=9000).
+      #   2. Variables de Entorno del Sistema (Docker Compose).
+      #   3. Propiedades del Config Server (archivos .yml remotos).
+      #   4. Propiedades locales (application.yml o application.properties dentro del JAR).
+      #Estos valores reemplazan las propiedades de configuración en application.yml, permitiendo que el servicio se conecte a la base de datos y al config server correctamente dentro del entorno de Docker
+      #También reemplazan las propiedades del config server. Si el config server tiene estas propiedades, las del entorno de Docker las sobreescriben, lo que es útil para mantener la configuración específica del entorno fuera del control de versiones.
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://users-db:5432/users_db
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      config-server:
+        condition: service_healthy
+      users-db:
+        condition: service_healthy
+    networks:
+      - ms-banking-net
+
+  inventory-service:
+    build:
+      context: .
+      dockerfile: services/inventory-service/Dockerfile
+    container_name: inventory-service
+    ports:
+      - "8084:8084"
+    environment:
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://inventory-db:5432/inventory_db
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      config-server:
+        condition: service_healthy
+      inventory-db:
+        condition: service_healthy
+    networks:
+      - ms-banking-net
+
+  orders-service:
+    build:
+      context: .
+      dockerfile: services/orders-service/Dockerfile
+    container_name: orders-service
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://orders-db:5432/orders_db
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      config-server:
+        condition: service_healthy
+      orders-db:
+        condition: service_healthy
+    networks:
+      - ms-banking-net
+
+  payments-service:
+    build:
+      context: .
+      dockerfile: services/payments-service/Dockerfile
+    container_name: payments-service
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://payments-db:5432/payments_db
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      config-server:
+        condition: service_healthy
+      payments-db:
+        condition: service_healthy
+    networks:
+      - ms-banking-net
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./infra/api-gateway
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      config-server:
+        condition: service_healthy
+    networks:
+      - ms-banking-net
+
+networks:
+  ms-banking-net:
+    driver: bridge
+
+volumes:
+  users-db-data:
+  inventory-db-data:
+  orders-db-data:
+  payments-db-data:

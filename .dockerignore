@@ -1,0 +1,14 @@
+**/target/
+**/*.log
+.idea/
+.mvn/
+mvnw
+mvnw.cmd
+.git/
+.gitignore
+*.iml
+*.iws
+*.ipr
+README.md
+LICENSE
+docker-compose.yml
