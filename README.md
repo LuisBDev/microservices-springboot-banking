@@ -1,15 +1,16 @@
 # Microservices Banking Platform
 
-A production-ready microservices-based banking platform built with Spring Boot and Spring Cloud, demonstrating modern distributed systems architecture and best practices.
+A production-ready microservices-based banking platform built with Spring Boot and Spring Cloud. This project follows a decentralized architecture where each microservice is a completely independent Maven project, orchestrated via Docker.
 
 ## Architecture Overview
 
-This project implements a microservices architecture with the following components:
+The system implements a distributed architecture with the following components:
 
-- **API Gateway**: Single entry point for all client requests with load balancing
-- **Service Discovery**: Eureka server for dynamic service registration and discovery
-- **Configuration Server**: Centralized configuration management
-- **Business Services**: Users, Orders, Payments, and Inventory microservices
+- **API Gateway**: Single entry point for all client requests with dynamic routing and load balancing.
+- **Service Discovery**: Eureka server for service registration and discovery.
+- **Configuration Server**: Centralized configuration management using Spring Cloud Config.
+- **Business Services**: Users, Orders, Payments, and Inventory microservices.
+- **Shared Library**: A standalone library (commons-lib) for standardized error handling.
 
 ### Architecture Diagram
 
@@ -36,189 +37,94 @@ API Gateway (8080)
 
 ## Technology Stack
 
-### Core Framework
+### Core Frameworks
+- **Java 21**: LTS version.
+- **Spring Boot 3.5.9**: Core application framework.
+- **Spring Cloud 2025.0.1**: Distributed systems patterns.
+- **Maven**: Build and dependency management.
 
-- **Java 21**: Latest LTS version
-- **Spring Boot 3.5.9**: Core application framework
-- **Maven**: Dependency management and build tool
+### Infrastructure & Persistence
+- **Docker & Docker Compose**: Containerization and orchestration.
+- **PostgreSQL 15**: Relational database (Independent instance per service).
+- **Flyway**: Database versioning and automated migrations.
 
-### Spring Cloud Components
-
-- **Spring Cloud Config**: Centralized configuration management
-- **Spring Cloud Gateway**: API Gateway with WebFlux
-- **Netflix Eureka**: Service discovery and registration
-- **OpenFeign**: Declarative REST client for inter-service communication
-
-### Database & Persistence
-
-- **PostgreSQL**: Relational database (one database per microservice)
-- **Spring Data JPA**: Data access layer with Hibernate
-- **Flyway**: Database migration and versioning
-
-### Additional Libraries
-
-- **Lombok**: Boilerplate code reduction
-- **MapStruct**: Type-safe object mapping
-- **Jakarta Validation**: Input validation
-- **Spring Boot Actuator**: Production-ready monitoring and metrics
-- **Commons-Lib**: Shared library for standardized exception handling and error responses
-
-### Development Tools
-
-- **Spring Boot DevTools**: Hot reload during development
+### Communication & Tooling
+- **OpenFeign**: Declarative REST clients.
+- **MapStruct**: High-performance object mapping.
+- **Lombok**: Boilerplate reduction.
+- **Spring Boot Actuator**: Health monitoring and metrics.
 
 ## Prerequisites
 
-Before starting, ensure you have the following installed:
+- **Docker & Docker Compose**: Recommended for production-like environments.
+- **Java Development Kit (JDK) 21**: For manual development.
+- **Maven 3.9+**: For manual development.
 
-- **Java Development Kit (JDK) 21**
-- **Maven 3.9+**
-- **PostgreSQL 14+**
-- **Git**
+## Deployment with Docker
 
-## Database Setup
+The project uses Docker Compose to orchestrate services and their respective databases. Each business service has its own isolated PostgreSQL container.
 
-Create the following PostgreSQL databases:
+### 1. Run Everything
 
-```sql
-CREATE DATABASE users_db;
-CREATE DATABASE orders_db;
-CREATE DATABASE payments_db;
-CREATE DATABASE inventory_db;
-```
-
-Default credentials (configurable in Config Server):
-
-- Username: `postgres`
-- Password: `postgres`
-- Host: `localhost`
-- Port: `5432`
-
-### Database Migrations with Flyway
-
-Each microservice uses Flyway for database version control and schema migrations. Migration scripts are located in:
-
-```
-services/{service-name}/src/main/resources/db/migration/
-```
-
-#### Migration File Naming Convention
-
-Follow the Flyway naming pattern:
-
-```
-V{version}__{description}.sql
-```
-
-Examples:
-
-- `V1__create_users_table.sql`
-- `V2__add_user_indexes.sql`
-- `V3__alter_users_add_status.sql`
-
-#### Migration Execution
-
-Flyway migrations run automatically when each service starts:
-
-1. Flyway checks the `flyway_schema_history` table
-2. Executes pending migrations in version order
-3. Records successful migrations in the history table
-
-#### Example Migration Structure
-
-```
-inventory-service/src/main/resources/db/migration/
-├── V1__create_products_table.sql
-├── V2__add_product_indexes.sql
-└── V3__insert_initial_products.sql
-```
-
-Each service's migrations are independent and manage their own database schema.
-
-## Project Setup
-
-### 1. Clone the Repository
+To build and start all infrastructure and business services:
 
 ```bash
-git clone <repository-url>
-cd microservices_banking
+docker-compose up --build -d
 ```
 
-### 2. Build the Project
+### 2. Update a Specific Service
 
-Build commons-lib first, then all modules:
+If you modify the code of a single microservice, you can rebuild and update it without affecting the rest of the system:
 
 ```bash
-mvn clean install -DskipTests
+docker-compose up -d --build <service-name>
 ```
 
-This command will:
+Example for Users Service:
+```bash
+docker-compose up -d --build users-service
+```
 
-- Install commons-lib in local Maven repository
-- Compile all microservices
-- Generate MapStruct implementations
-- Package all applications
+### 3. Update Shared Library (commons-lib)
 
-### 3. Service Startup Order
-
-Start services in the following order to ensure proper initialization:
-
-#### Step 1: Start Eureka Server
+Since business services depend on `commons-lib`, if you modify the library, you must rebuild the services that consume it:
 
 ```bash
-cd infra/eureka-server
-mvn spring-boot:run
+docker-compose up -d --build users-service inventory-service orders-service payments-service
 ```
 
-Wait until the service is fully started. Access Eureka Dashboard at: `http://localhost:8761`
-
-#### Step 2: Start Config Server
+### 4. Stopping the Environment
 
 ```bash
-cd infra/config-server
-mvn spring-boot:run
+docker-compose down
 ```
 
-Wait until the service is fully started and registered with Eureka (check logs for "Started ConfigServerApplication").
+## Independent Development
 
-#### Step 3: Start Business Services
+Each microservice is now an independent Maven project. There is no parent POM at the root level.
 
-Start all business services (order doesn't matter):
+### Manual Setup for Development
 
-```bash
-# Terminal 1 - Users Service
-cd services/users-service
-mvn spring-boot:run
+If you wish to run services outside of Docker:
 
-# Terminal 2 - Inventory Service
-cd services/inventory-service
-mvn spring-boot:run
+1. **Install Shared Library**: Navigate to `commons-lib` and install it in your local Maven repository.
+   ```bash
+   cd commons-lib
+   mvn clean install
+   ```
 
-# Terminal 3 - Payments Service
-cd services/payments-service
-mvn spring-boot:run
+2. **Database Setup**: Ensure you have PostgreSQL instances running and create the following databases:
+   - `users_db`
+   - `orders_db`
+   - `payments_db`
+   - `inventory_db`
 
-# Terminal 4 - Orders Service
-cd services/orders-service
-mvn spring-boot:run
-```
+3. **Start Services**: Run each service independently using Maven.
+   ```bash
+   mvn spring-boot:run
+   ```
 
-#### Step 4: Start API Gateway
-
-```bash
-cd infra/api-gateway
-mvn spring-boot:run
-```
-
-### 4. Verify Deployment
-
-- **Eureka Dashboard**: `http://localhost:8761`
-    - All services should be registered (Users, Orders, Payments, Inventory, Gateway, Config Server)
-
-- **API Gateway Health**: `http://localhost:8080/actuator/health`
-    - Should return `{"status":"UP"}`
-
-## Service Ports
+## Service Ports & Infrastructure
 
 | Service           | Port | Description                        |
 |-------------------|------|------------------------------------|
@@ -227,201 +133,31 @@ mvn spring-boot:run
 | Orders Service    | 8082 | Order processing and orchestration |
 | Payments Service  | 8083 | Payment processing                 |
 | Inventory Service | 8084 | Product inventory management       |
-| Eureka Server     | 8761 | Service discovery                  |
-| Config Server     | 8888 | Configuration management           |
-
-## API Endpoints
-
-All requests go through the API Gateway at `http://localhost:8080`
-
-### Users Service
-
-```
-GET    /api/users/{id}              - Get user by ID
-GET    /api/users/username/{username} - Get user by username
-POST   /api/users                   - Create new user
-PUT    /api/users/{id}              - Update user
-DELETE /api/users/{id}              - Delete user
-```
-
-### Inventory Service
-
-```
-GET    /api/inventory/products/{id}          - Get product by ID
-GET    /api/inventory/products/sku/{sku}     - Get product by SKU
-GET    /api/inventory/products               - Get all products
-POST   /api/inventory/products               - Create product
-PUT    /api/inventory/products/{id}          - Update product
-DELETE /api/inventory/products/{id}          - Delete product
-POST   /api/inventory/products/reserve       - Reserve stock
-POST   /api/inventory/products/release       - Release stock
-GET    /api/inventory/products/check-stock/{sku}/{quantity} - Check availability
-```
-
-### Payments Service
-
-```
-POST   /api/payments/process                    - Process payment
-GET    /api/payments/{id}                       - Get payment by ID
-GET    /api/payments/transaction/{transactionId} - Get payment by transaction ID
-GET    /api/payments/order/{orderId}            - Get payments by order
-GET    /api/payments/user/{userId}              - Get payments by user
-POST   /api/payments/{id}/refund                - Refund payment
-```
-
-### Orders Service
-
-```
-POST   /api/orders                  - Create order (orchestrates all services)
-GET    /api/orders/{id}             - Get order by ID
-GET    /api/orders/user/{userId}    - Get orders by user
-POST   /api/orders/{id}/cancel      - Cancel order
-```
-
-## Configuration
-
-Configuration files are centralized in the Config Server at:
-
-```
-infra/config-server/src/main/resources/config/
-```
-
-Files:
-
-- `api-gateway.yml` - Gateway routes and load balancing
-- `users-service.yml` - Users service configuration
-- `orders-service.yml` - Orders service configuration
-- `payments-service.yml` - Payments service configuration
-- `inventory-service.yml` - Inventory service configuration
-
-### Key Configuration Points
-
-#### Database Configuration
-
-Each service has its own database connection configured in its respective YAML file.
-
-#### Eureka Configuration
-
-All services register with Eureka at `http://localhost:8761/eureka/`
-
-#### Feign Client Configuration
-
-- Connection timeout: 5000ms
-- Read timeout: 5000ms
-- Logger level: BASIC
-
-#### API Gateway Routes
-
-Routes follow the pattern:
-
-```
-/api/{service-name}/** → lb://{service-name}
-```
-
-StripPrefix removes `/api` before forwarding to the target service.
+| Eureka Server     | 8761 | Service discovery dashboard        |
+| Config Server     | 8888 | Centralized configuration          |
 
 ## Project Structure
 
 ```
 microservices_banking/
-├── commons-lib/             # Shared library for exception handling
-│   └── src/main/java/com/msbanking/commons/exception/
-│       ├── ErrorResponse.java       # Standard error response DTO
-│       ├── ErrorCode.java          # Centralized error catalog
-│       └── BusinessException.java  # Base business exception
+├── commons-lib/             # Independent shared library
 ├── infra/
-│   ├── api-gateway/         # API Gateway (Spring Cloud Gateway)
-│   ├── config-server/       # Config Server (Spring Cloud Config)
-│   └── eureka-server/       # Service Discovery (Netflix Eureka)
+│   ├── api-gateway/         # Independent Edge service
+│   ├── config-server/       # Independent Config service
+│   └── eureka-server/       # Independent Discovery service
 ├── services/
-│   ├── users-service/       # User management microservice
-│   ├── orders-service/      # Order processing microservice
-│   ├── payments-service/    # Payment processing microservice
-│   └── inventory-service/   # Inventory management microservice
-└── pom.xml                  # Parent POM with dependency management
-```
-
-Each microservice follows a layered architecture:
-
-```
-service/
-├── controller/    # REST API endpoints
-├── service/       # Business logic
-├── repository/    # Data access layer
-├── entity/        # JPA entities
-├── dto/           # Data Transfer Objects
-│   ├── request/   # Request DTOs
-│   ├── response/  # Response DTOs
-├── mapper/        # MapStruct mappers
-├── client/        # Feign clients (Orders service only)
-├── exception/     # Exception handling
-│   └── GlobalExceptionHandler.java
-└── enums/         # Enumerations
-```
-
-## Development Workflow
-
-### Running in Development Mode
-
-Spring Boot DevTools is enabled. Changes to Java files will trigger automatic restart.
-
-### Testing Endpoints
-
-Example: Create a user and fetch via Gateway
-
-```bash
-# Create user
-curl -X POST http://localhost:8080/api/users \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "johndoe",
-    "email": "john@example.com",
-    "firstName": "John",
-    "lastName": "Doe",
-    "phone": "+1234567890",
-    "password": "password123"
-  }'
-
-# Fetch user
-curl http://localhost:8080/api/users/1
-```
-
-### Monitoring Services
-
-- **Eureka Dashboard**: `http://localhost:8761` - View all registered services
-- **Actuator Health**: `http://localhost:{port}/actuator/health` - Check service health
-- **Actuator Info**: `http://localhost:{port}/actuator/info` - Service information
-
-## Commons Library
-
-The project includes a **shared library** (`commons-lib`) that provides standardized components for exception handling and error responses across all microservices.
-
-### Components
-
-- **ErrorResponse**: Standardized error response DTO with consistent structure
-- **ErrorCode**: Centralized catalog of error codes organized by domain (ORD-XXX, USR-XXX, INV-XXX, PAY-XXX, GEN-XXX)
-- **BusinessException**: Base exception class for business logic errors
-
-### Installation
-
-The library is installed in the local Maven repository and included as a dependency in all microservices:
-
-```bash
-cd commons-lib
-mvn clean install
+│   ├── users-service/       # Independent User service
+│   ├── orders-service/      # Independent Order service
+│   ├── payments-service/    # Independent Payment service
+│   └── inventory-service/   # Independent Inventory service
+└── docker-compose.yml       # Infrastructure orchestration
 ```
 
 ## Best Practices Implemented
 
-- **Clean Code**: Meaningful names, SOLID principles, separation of concerns
-- **Layer Separation**: Controller → Service → Repository pattern
-- **DTO Pattern**: Separate DTOs from entities to avoid exposing internal structure
-- **Validation**: Jakarta Bean Validation on request DTOs
-- **Standardized Error Handling**: Shared commons-lib for consistent error responses
-- **Error Catalog**: Centralized error codes for better traceability and monitoring
-- **Database Migration**: Flyway for version-controlled schema changes
-- **Service Discovery**: Dynamic service registration, no hardcoded URLs
-- **Load Balancing**: Client-side load balancing via Eureka
-- **Centralized Configuration**: Single source of truth for all configurations
-- **Idiomatic Code**: Following Java and Spring Boot conventions
-
+- **Microservice Independence**: No shared build logic or parent wrappers. Each service is autonomous.
+- **Database per Service**: Isolated data persistence with dedicated PostgreSQL containers.
+- **Automated Migrations**: Flyway manages schema changes independently for each service.
+- **Layered Architecture**: Clear separation between Controller, Service, and Repository layers.
+- **Standardized Errors**: Centralized error catalog and response structure via `commons-lib`.
+- **Health Monitoring**: Production-grade health checks and metrics using Spring Actuator.
